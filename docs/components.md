@@ -1,178 +1,68 @@
-# Components
-
-Currently only available in Japanese.
-
-NeoShowcaseの開発・運用に使われている要素技術の紹介
+Here's a translation of the information about the components used in NeoShowcase:
 
 ## Standalone Components
 
-### [Buildkit](https://github.com/moby/buildkit)
+### Buildkit
+- Description: A tool for building Docker images. It can build Docker images without Docker and run them within containers. NeoShowcase uses it as a server for application builds, controlled remotely through gRPC API by starting a daemon called `buildkitd`.
+- Note: It internally uses LLB (Low Level Build definition format) for image building, although Dockerfile is more commonly used.
 
-Dockerイメージをビルドするツール
+### Buildpacks
+- Description: A tool to build Docker images from application code without Dockerfiles. It detects optimal build settings from the code and creates Docker images. NeoShowcase mainly uses the Paketo Buildpacks implementation.
+  
+### gRPC
+- Description: A Google-developed RPC framework using HTTP/2. NeoShowcase uses gRPC for communication between various purpose-specific servers, such as management and build servers.
+  
+### Connect
+- Description: A protocol for communication using HTTP/1.1 and HTTP/2 POST methods. It is used for routing authentication to the traefik forward auth middleware in NeoShowcase.
 
-Dockerの代わりにDockerイメージをビルドできて、コンテナの中で動かすことができる。
-[`buildkitd`](https://github.com/moby/buildkit#containerizing-buildkit)と言うデーモンを起動することでgRPC APIを用いてリモートから操作できるので、NeoShowcaseではこれをアプリビルド用のサーバーとして使う。
+### Traefik Proxy
+- Description: A modern reverse proxy used for connecting components and routing user applications in NeoShowcase, especially in Kubernetes.
 
-Buildkit内部ではLLB(Low Level Build definition format)という中間表現を用いてイメージのビルドを行っており、これを直接操作することも可能。
-ただしドキュメントに乏しく、Dockerfile frontendのほうが安定しているため、ほとんどはDockerfile経由でビルドしている。
-静的サイトを生成物をイメージから取り出すときなどにLLBを使っている。
+### protoc (Protocol Buffer Compiler)
+- Description: A compiler used to generate `.go` files from `.proto` files for Protocol Buffers. It's used for defining the specifications of functions for communication between various components in NeoShowcase.
 
-### [Buildpacks](https://buildpacks.io/)
+### evans
+- Description: A gRPC client for interactive debugging and testing of gRPC APIs. It's used when direct access to gRPC is needed.
 
-Dockerfile無しでアプリケーションのコードからDockerイメージをビルドするツール
+### sqldef
+- Description: A tool for idempotent schema management of MySQL, PostgreSQL, SQLite3, and SQL Server using SQL files. It's used for managing database schema changes in a safe and repeatable manner.
 
-アプリケーションが含むファイルやコードから、各"buildpack"が最適なビルド設定を検出し、Dockerイメージを作成する。
-自身で"buildpack"を作成することもできる。
+### sql-migrate (currently not used, replaced by sqldef)
+- Description: A database schema migration tool used to version control and apply database changes during development. NeoShowcase transitioned from sql-migrate to sqldef for better idempotence.
 
-NeoShowcaseでは主に、buildpackの実装の一つであるpaketo-buildpacksを使用。
+### tbls
+- Description: A tool for generating documentation and linting from real databases. NeoShowcase uses it to automatically generate ER diagrams and documents from its database.
 
-### [gRPC](https://grpc.io/)
+### golangci-lint
+- Description: A linter for Go code, used for code formatting and detecting potential issues.
 
-Google謹製のHTTP/2を利用したRPCフレームワーク
+### Swagger / OpenAPI 3.0 (currently not used, replaced by Connect)
+- Description: A specification for describing HTTP APIs. NeoShowcase used it for defining API specifications in the past but currently relies on `.proto` files for all communication.
 
-NeoShowcaseでは、管理サーバー・ビルドサーバーなど目的別サーバー間の通信手段としてgRPCを用いる。
-
-`Protocol Buffer 3`形式(`.proto`)で通信で使う関数の仕様を定義すると、各種言語に対応したサーバー・クライアントのコードを自動生成してくれて、開発者は関数の中身だけ実装すれば良くなる。
-
-例: [Controllerコンポーネントの`proto`ファイル](https://github.com/traPtitech/NeoShowcase/blob/bc9694ca525c1c52530fe2b0358987e64e34900e/api/proto/neoshowcase/protobuf/controller.proto) でns-controllerとns-gatewayの通信を定義して、コード自動生成すると[こんなコード](https://github.com/traPtitech/NeoShowcase/blob/bc9694ca525c1c52530fe2b0358987e64e34900e/pkg/infrastructure/grpc/pb/controller.pb.go)を自動生成してくれて、自分たちは[関数の中身の実装](https://github.com/traPtitech/NeoShowcase/blob/bc9694ca525c1c52530fe2b0358987e64e34900e/pkg/infrastructure/grpc/controller_service.go)をすればいいだけになる。
-
-### [Connect](https://connect.build/)
-
-A better gRPC.
-
-HTTP/1.1, HTTP/2のPOSTメソッドだけを用いて通信を行うプロトコル。
-Connectによって生成されたサーバーまたはクライアントのコードはデフォルトでgRPC, gRPC-Web, Connectの3つのプロトコルに対応する。
-
-Connect protocolのWebクライアントはデフォルトでapplication/jsonで通信を行うため、人間が理解しやすく、既存のRESTful APIのエコシステムにも上手くハマる。
-NeoShowcaseではこの利点を生かしてtraefik forward auth middlewareに認証を委譲している。
-
-### [traefik proxy](https://doc.traefik.io/traefik/)
-
-モダンなリバースプロキシ
-
-各コンポーネントの接続と、ユーザーのアプリへのルーティングに使用している。
-K8s backendでは、Ingress Controllerとして使用。
-
-### [protoc (Protocol Buffer Compiler)](https://github.com/protocolbuffers/protobuf)
-
-`.proto`ファイルから`.go`ファイルなどを生成するときに使うコンパイラ
-
-`make init` で入るようにしてある。
-macなら`brew install protobuf`でも入るはず。
-
-`protoc-gen-go` (protocのgoコンパイルプラグイン) が必要。
-インストール: `go install google.golang.org/protobuf/cmd/protoc-gen-go`
-
-https://grpc.io/docs/languages/go/quickstart/ も参照
-
-### [evans](https://github.com/ktr0731/evans)
-
-gRPC用クライアント
-
-gRPCは当然Postmanとかcurlとかでアクセス出来ないので、デバッグするときとかには専用クライアントが必要。
-これは対話的に呼び出せたりして補完とかも効くので便利。
-
-### [sqldef](https://github.com/k0kubun/sqldef)
-
-> The easiest idempotent MySQL/PostgreSQL/SQLite3/SQL Server schema management by SQL.
-
-.sqlファイルにテーブルやindex, foreign keyの定義を書いて、`sqldef schema.sql` すると、.sqlファイルの内容に沿うようにスキーマを変更してくれる。
-
-マイグレーションバージョンの管理が必要なく、冪等で扱いやすい。
-新・旧どちらのバージョンにも互換性のあるスキーマを定義し、sqldefでスキーマを更新してから新しいバージョンのデプロイを行うのが普通。
-ただし少し凝ったスキーマの変更を行うときは、データの手動マイグレーションが必要になったり、データがうっかり落ちないように注意する必要がある。
-
-### [sql-migrate](https://github.com/rubenv/sql-migrate) (現在不使用 -> sqldef)
-
-DBスキーママイグレーションツール
-
-新たなテーブルを追加したり、既存のテーブルのカラムを追加したりして、開発中にDBのテーブル構造を変えるときに、その変更手順や巻き戻し手順を書いて、DBの構造のバージョン管理をするようにするためのツール。
-多分一番シンプル。マイグレーションバージョンの管理、正しいマイグレーションスクリプトの管理を自分で行う必要がある。
-
-NeoShowcaseでは昔sql-migrateを使っていたが、冪等なツールが便利そうだったのでsqldefに移行した。
-
-### [tbls](https://github.com/k1LoW/tbls)
-
-RDBドキュメント自動生成ツール
-
-実際のDBからER図やドキュメントを自動生成したり、DBのLintなどもできる。
-
-例: [こういうの](https://github.com/traPtitech/NeoShowcase/tree/master/docs/dbschema)を自動生成する。
-
-### [golangci-lint](https://github.com/golangci/golangci-lint)
-
-Goコード用のLinter
-
-Linter: コードのフォーマットを指摘してくれたり、危ないコードや不要なコードを検出してくれるツール
-
-### [swagger / OpenAPI 3.0](https://swagger.io/specification/) (現在不使用 -> Connect)
-
-HTTPのAPI仕様を記述するための仕様
-
-traPの内製サービスはほぼ全てこれでAPIの仕様を決定している。
-https://apis.trap.jp/
-
-NeoShowcaseでは、昔、Webダッシュボード(管理画面)とサーバー間のAPI仕様を書くのに使っていた。
-現在はprotocファイルにかかれていることが全て。
-
-### [spectral](https://github.com/stoplightio/spectral) (現在不使用)
-
-`swagger.yaml`用のLinter
+### spectral (currently not used)
+- Description: A linter for `swagger.yaml` files.
 
 ## Go Libraries
 
-### [sqlboiler](https://github.com/volatiletech/sqlboiler)
+### sqlboiler
+- Description: A code generator for SQL database ORMs in Go. NeoShowcase uses it to generate ORM libraries based on the database schema.
 
-Go用のSQLDBのORマッパー**ジェネレーター**
+### Echo
+- Description: A web server library used in NeoShowcase for various purposes, including serving static sites.
 
-他のSysAdプロジェクトでGoからMariaDBにアクセスするときには主に[Gorm](https://gorm.io/)というORMライブラリを使ってますが、NeoShowcaseではデータベースのスキーマからORMライブラリを**生成**するsqlboilerを使います。
-NeoShowcase専用のORMライブラリが出来る。
+### logrus
+- Description: A library for logging console output in a structured manner, used for NeoShowcase's logging.
 
-[DBスキーマ](https://github.com/traPtitech/NeoShowcase/tree/master/docs/dbschema)に従ってDBを作成した後、そのDBの構造に従った構造体を[こんな感じ](https://github.com/traPtitech/NeoShowcase/blob/bc9694ca525c1c52530fe2b0358987e64e34900e/pkg/infrastructure/repository/models/applications.go)で自動生成してくれる。
+### cobra / viper
+- Description: Cobra is a command-line tool library, and Viper is a library for handling configuration files. They are used for creating command-line tools in NeoShowcase.
 
-参考:
-[Goの新定番？ORMのSQLBoilerを使ってみる | Qiita](https://qiita.com/uhey22e/items/640a4ae861d123b15b53)
-[SQLBoiler の使い方を簡単にまとめた | note](https://note.crohaco.net/2020/golang-sqlboiler/)
+### Wire
+- Description: A library for generating dependency injection code automatically. NeoShowcase uses it to handle dependency injection in its codebase.
 
-### [Echo](https://echo.labstack.com/)
+### docker/client
+- Description: The official Go library for interacting with Docker. NeoShowcase uses it to interact with Docker for container-related operations.
 
-SysAd内のデファクトスタンダードなWebサーバーライブラリ
+### Hub (currently not used)
+- Description: A pub/sub-style internal event bus library used for communication between different parts of the codebase. It helps decouple components in the code but should be used cautiously to avoid overcomplicating control flow.
 
-built-inのstatic-site generator内で使用
-
-### [logrus](https://github.com/sirupsen/logrus)
-
-コンソールログをいい感じに出力するようにするやつ
-
-Goの標準logライブラリと互換性があるのでimport文変えるだけで使える。
-NeoShowcase自身のログの出力にはこれを使う。
-
-### [cobra](https://github.com/spf13/cobra) / [viper](https://github.com/spf13/viper)
-
-cobraはGoのコマンドラインツール作成支援ライブラリ
-viperは設定ファイル取り扱いライブラリ
-
-同じ作者のライブラリで連携している。
-NeoShowcaseでは、[`cmd`](https://github.com/traPtitech/NeoShowcase/tree/master/cmd)以下で、実際の実行バイナリのコマンドを作るのに使う。
-
-### [Wire](https://github.com/google/wire)
-
-DI(Dependency Injection)のためのコードを自動生成してくれるライブラリ
-
-参考: https://github.com/google/wire/tree/main/_tutorial
-
-### [docker/client](https://github.com/moby/moby)
-
-GoからDockerを操作するための公式ライブラリ
-
-[`backend/dockerimpl`](https://github.com/traPtitech/NeoShowcase/tree/master/pkg/infrastructure/backend/dockerimpl)中で使ってる。
-
-### [Hub](https://github.com/leandro-lugaresi/hub) (現在不使用)
-
-PubSub型の内部イベントバスライブラリ。
-
-コード内でイベントのPublish / Subscribeができる。
-イベントバス使うとコード依存が疎結合になってメンテしやすくなる。
-
-任意のコントロールフローのスパゲッティ化を容易にしてしまうため、使いすぎには注意。
-必要ない場合は使わない方が吉かも。
+This translation should help you understand the various components and libraries used in NeoShowcase. If you have any specific questions or need more details about any component, feel free to ask.
